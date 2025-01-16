@@ -21,8 +21,8 @@ def list_access_files(directory: Path) -> list[Path]:
 def read_access_database(file_path: Path) -> dict[str, pl.DataFrame]:
     """Read all tables from an Access database file."""
     connection_string = (
-        f"DRIVER={{Microsoft Access Driver (*.mdb, *.accdb)}};"
-        f"DBQ={file_path};"
+        r"Driver={Microsoft Access Driver (*.mdb, *.accdb)};"
+        rf"DBQ={file_path};"
     )
     with pyodbc.connect(connection_string) as connection:
         try:
@@ -61,7 +61,7 @@ def save_to_duckdb(data: dict[str, pl.DataFrame], output_file: Path) -> None:
     with duckdb.connect(output_file) as con:
         for table_name, df in data.items():
             try:
-                df.write_database(table_name, con)
+                con.sql(f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM df")
                 logger.info("Saved table %s to DuckDB", table_name)
             except Exception as e:
                 logger.error("Failed to create table %s in DuckDB: %s", table_name, e)
@@ -73,7 +73,7 @@ def save_to_sqlite(data: dict[str, pl.DataFrame], output_file: Path) -> None:
     with sqlite3.connect(output_file) as con:
         for table_name, df in data.items():
             try:
-                df.write_database(table_name, con)
+                df.write_database(table_name, con, engine="adbc")
                 logger.info("Saved table %s to SQLite", table_name)
             except Exception as e:
                 logger.error("Failed to create table %s in SQLite: %s", table_name, e)
