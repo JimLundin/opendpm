@@ -49,12 +49,8 @@ def download_and_extract(url: str, target_dir: Path) -> None:
         finally:
             os.unlink(temp_file.name)
 
-def download_databases(config_file: Path, target_dir: Path, skip_if_exists: bool = False) -> None:
+def download_databases(config_file: Path, target_dir: Path) -> None:
     """Download all database files specified in the config."""
-    if skip_if_exists and any(target_dir.glob("*.mdb")) or any(target_dir.glob("*.accdb")):
-        logger.info("Using cached database files in %s", target_dir)
-        return
-        
     sources = load_sources(config_file)
     for version, url in sources.items():
         try:
