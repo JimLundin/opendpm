@@ -58,7 +58,7 @@ def read_access_database(file_path: Path) -> dict[str, pl.DataFrame]:
 
 def save_to_duckdb(data: dict[str, pl.DataFrame], output_file: Path) -> None:
     """Save all tables in a DuckDB file."""
-    with duckdb.connect(str(output_file)) as con:
+    with duckdb.connect(output_file) as con:
         for table_name, df in data.items():
             try:
                 df.write_database(table_name, con)
@@ -70,7 +70,7 @@ def save_to_duckdb(data: dict[str, pl.DataFrame], output_file: Path) -> None:
 
 def save_to_sqlite(data: dict[str, pl.DataFrame], output_file: Path) -> None:
     """Save all tables in a SQLite file."""
-    with sqlite3.connect(str(output_file)) as con:
+    with sqlite3.connect(output_file) as con:
         for table_name, df in data.items():
             try:
                 df.write_database(table_name, con)

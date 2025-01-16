@@ -1,13 +1,10 @@
-name: Convert and Release Databases
+name: Test Database Conversion
 
 on:
-  push:
-    tags:
-      - 'v*'  # Trigger on version tags
   workflow_dispatch:  # Allow manual trigger
 
 jobs:
-  convert-and-release:
+  test-conversion:
     runs-on: windows-latest
     
     steps:
@@ -31,19 +28,15 @@ jobs:
         Invoke-WebRequest -Uri $url -OutFile "AccessDatabaseEngine.exe"
         Start-Process -FilePath "AccessDatabaseEngine.exe" -ArgumentList "/quiet" -Wait
     
-    - name: Run deployment process
+    - name: Run conversion process
       run: |
         python -m dpm.cli
     
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      if: startsWith(github.ref, 'refs/tags/')
+    - name: Upload converted databases as artifacts
+      uses: actions/upload-artifact@v4
       with:
-        files: |
+        name: converted-databases
+        path: |
           .scratch/db_output/*.duckdb
           .scratch/db_output/*.sqlite
-        body_path: release_notes.md
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if-no-files-found: error
