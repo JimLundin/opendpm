@@ -55,8 +55,8 @@ def read_access_database(file_path: Path) -> dict[str, pl.DataFrame]:
 
 def save_to_duckdb(data: dict[str, pl.DataFrame], output_file: Path) -> None:
     """Save all tables in a DuckDB file."""
-    with duckdb.connect(output_file) as con:
-        for table_name, df in data.items():
+    with duckdb.connect(output_file) as con: # type: ignore
+        for table_name, df in data.items(): # type: ignore
             try:
                 con.sql(f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM df")
                 logger.info("Saved table %s to DuckDB", table_name)
