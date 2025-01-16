@@ -12,6 +12,7 @@
 -e file:.
 adbc-driver-manager==1.3.0
     # via adbc-driver-sqlite
+    # via dpm
 adbc-driver-sqlite==1.3.0
     # via dpm
 certifi==2024.12.14
