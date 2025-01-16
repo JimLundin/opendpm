@@ -20,6 +20,8 @@ idna==3.10
     # via requests
 polars==1.19.0
     # via dpm
+pyarrow==19.0.0
+    # via polars
 pyodbc==5.1.0
     # via dpm
 requests==2.32.3
