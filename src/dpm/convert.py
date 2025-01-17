@@ -58,7 +58,7 @@ def save_to_duckdb(data: dict[str, pl.DataFrame], output_file: Path) -> None:
     with duckdb.connect(output_file) as con: # type: ignore
         for table_name, df in data.items(): # type: ignore
             try:
-                con.sql(f"CREATE OR REPLACE TABLE `{table_name}` AS SELECT * FROM df")
+                con.sql(f"CREATE OR REPLACE TABLE '{table_name}' AS SELECT * FROM df")
                 logger.info("Saved table %s to DuckDB", table_name)
             except Exception as e:
                 logger.error("Failed to create table %s in DuckDB: %s", table_name, e)
