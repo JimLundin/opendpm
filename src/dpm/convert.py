@@ -75,9 +75,19 @@ def save_to_sqlite(data: dict[str, pl.DataFrame], output_file: Path) -> None:
             logger.error("Failed to create table %s in SQLite: %s", table_name, e)
 
 
+def merge_dataframes(dfs: list[pl.DataFrame]) -> pl.DataFrame:
+    """Merge multiple dataframes with the same schema."""
+    if not dfs:
+        return pl.DataFrame()
+    return pl.concat(dfs, how="diagonal")
+
+
 def process_access_files(input_dir: Path, output_dir: Path) -> None:
     """Process all Access files in the input directory."""
     output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Dictionary to store all tables from all files
+    all_tables: dict[str, list[pl.DataFrame]] = {}
     
     for access_file in list_access_files(input_dir):
         try:
@@ -85,7 +95,7 @@ def process_access_files(input_dir: Path, output_dir: Path) -> None:
             data = read_access_database(access_file)
             
             if data:
-                # Save to both DuckDB and SQLite
+                # Save individual database files
                 duckdb_file = output_dir / f"{access_file.stem}.duckdb"
                 sqlite_file = output_dir / f"{access_file.stem}.sqlite"
                 
@@ -93,5 +103,31 @@ def process_access_files(input_dir: Path, output_dir: Path) -> None:
                 save_to_sqlite(data, sqlite_file)
                 logger.info("Successfully processed %s", access_file)
 
+                # Collect tables for the total database
+                for table_name, df in data.items():
+                    if table_name not in all_tables:
+                        all_tables[table_name] = []
+                    all_tables[table_name].append(df)
+
         except Exception as e:
             logger.error("Failed to process %s: %s", access_file, e)
+
+    # Create total databases if we have collected any tables
+    if all_tables:
+        try:
+            # Merge tables with the same name
+            total_data = {
+                table_name: merge_dataframes(dfs)
+                for table_name, dfs in all_tables.items()
+            }
+
+            # Save total databases
+            total_duckdb = output_dir / "total.duckdb"
+            total_sqlite = output_dir / "total.sqlite"
+
+            save_to_duckdb(total_data, total_duckdb)
+            save_to_sqlite(total_data, total_sqlite)
+            logger.info("Successfully created total databases")
+
+        except Exception as e:
+            logger.error("Failed to create total databases: %s", e)
