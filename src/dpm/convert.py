@@ -36,9 +36,9 @@ def read_access_database(file_path: Path) -> dict[str, pl.DataFrame]:
         for table_name in table_names:
             try:
                 query = f"SELECT * FROM [{table_name}]"
-                df = pl.read_database(query, connection)  # type: ignore
-                if not df.is_empty():
-                    tables[table_name] = df
+                table_df = pl.read_database(query, connection)  # type: ignore
+                if not table_df.is_empty():
+                    tables[table_name] = table_df
                 else:
                     logger.warning("Table %s is empty", table_name)
             except Exception:
