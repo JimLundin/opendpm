@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import io
+import logging
 import tomllib
 import zipfile
-from logging import getLogger
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import requests
 
-if TYPE_CHECKING:
-    from pathlib import Path
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
 
-logger = getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def load_sources(config_file: Path) -> dict[str, str]:
@@ -53,3 +55,11 @@ def download_databases(config_file: Path, target_dir: Path) -> None:
             logger.info("Successfully downloaded version %s", version)
         except Exception:
             logger.exception("Failed to download version %s", version)
+
+
+if __name__ == "__main__":
+    project_root = Path(__file__).resolve().parents[3]
+    config_path = project_root / "config" / "sources.toml"
+    input_dir = project_root / ".scratch" / "db_input"
+
+    download_databases(config_path, input_dir)

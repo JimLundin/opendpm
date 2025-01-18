@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from logging import getLogger
-from typing import TYPE_CHECKING
+import logging
+from pathlib import Path
 
 import duckdb
 import polars as pl
 import pyodbc
 
-if TYPE_CHECKING:
-    from pathlib import Path
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
 
-logger = getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def read_access_database(file_path: Path) -> dict[str, pl.DataFrame]:
@@ -129,3 +131,11 @@ def process_access_files(input_dir: Path, output_dir: Path) -> None:
 
         except Exception:
             logger.exception("Failed to create total databases")
+
+
+if __name__ == "__main__":
+    project_root = Path(__file__).resolve().parents[3]
+    input_dir = project_root / ".scratch" / "db_input"
+    output_dir = project_root / ".scratch" / "db_output"
+
+    process_access_files(input_dir, output_dir)
