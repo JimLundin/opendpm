@@ -19,29 +19,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def list_access_databases(directory: Path) -> list[Path]:
-    """List all Access databases in a directory."""
-    return list(directory.glob("**/*.accdb"))
+def migrate_databases(source_dir: Path, target_engines: list[Engine]) -> None:
+    """Migrate databases from source directory to target databases.
 
+    Args:
+        source_dir: Directory containing Access databases
+        target_engines: List of SQLAlchemy engines to migrate data to
 
-def migrate_databases(source_dir: Path, target_paths: list[Path]) -> None:
-    """Migrate databases from source directory to target databases."""
-    # Create target engines based on file extensions
-    target_engines: list[Engine] = []
-    for path in target_paths:
-        if path.suffix == ".sqlite":
-            url = f"sqlite:///{path}"
-        elif path.suffix == ".duckdb":
-            url = f"duckdb:///{path}"
-        else:
-            logger.error("Unsupported database type: %s", path.suffix)
-            continue
-
-        logger.info("Creating target engine for: %s", path)
-        target_engines.append(create_engine(url))
+    """
+    if not target_engines:
+        logger.error("No target engines provided")
+        return
 
     # Process each source database
-    for source_path in list_access_databases(source_dir):
+    for source_path in source_dir.glob("**/*.accdb"):
         logger.info("Processing database: %s", source_path.name)
         driver = "{Microsoft Access Driver (*.mdb, *.accdb)}"
         conn_str = f"DRIVER={driver};DBQ={source_path}"
@@ -74,20 +65,21 @@ def migrate_databases(source_dir: Path, target_paths: list[Path]) -> None:
                 continue
 
 
-def process_access_files(input_dir: Path, output_dir: Path) -> None:
-    """Process all Access files in the input directory."""
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    targets = [
-        output_dir / "dpm.sqlite",
-        output_dir / "dpm.duckdb",
-    ]
-
-    migrate_databases(input_dir, targets)
-
-
 if __name__ == "__main__":
+    # Setup directories
     project_root = Path(__file__).resolve().parents[3]
     input_dir = project_root / ".scratch" / "db_input"
     output_dir = project_root / ".scratch" / "db_output"
-    process_access_files(input_dir, output_dir)
+
+    # Create target engines
+    target_engines = [
+        create_engine(f"sqlite:///{output_dir / 'output.sqlite'}"),
+        create_engine(f"duckdb:///{output_dir / 'output.duckdb'}"),
+    ]
+
+    if not target_engines:
+        logger.error("Failed to create any target engines")
+        raise SystemExit(1)
+
+    # Run migration
+    migrate_databases(input_dir, target_engines)
