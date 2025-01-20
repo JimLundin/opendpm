@@ -43,26 +43,27 @@ def migrate_databases(source_dir: Path, target_engines: list[Engine]) -> None:
         metadata.reflect(bind=source_engine)
 
         # Copy each table to all targets
-        for table_name, table in metadata.tables.items():
-            logger.info("Copying table: %s", table_name)
+        with source_engine.connect() as conn:
+            for table_name, table in metadata.tables.items():
+                logger.info("Copying table: %s", table_name)
 
-            try:
-                # Read all data
-                data = source_engine.execute(table.select()).fetchall()
+                try:
+                    # Read all data
+                    data = conn.execute(table.select()).fetchall()
 
-                # Copy to each target
-                for engine in target_engines:
-                    table.metadata = MetaData()
-                    table.create(engine, checkfirst=True)
+                    # Copy to each target
+                    for engine in target_engines:
+                        table.metadata = MetaData()
+                        table.create(engine, checkfirst=True)
 
-                    if data:
-                        with engine.begin() as conn:
-                            conn.execute(table.insert(), data)
-                    else:
-                        logger.warning("Table %s is empty", table_name)
-            except Exception:
-                logger.exception("Failed to process table %s", table_name)
-                continue
+                        if data:
+                            with engine.begin() as target_conn:
+                                target_conn.execute(table.insert().values(data))
+                        else:
+                            logger.warning("Table %s is empty", table_name)
+                except Exception:
+                    logger.exception("Failed to process table %s", table_name)
+                    continue
 
 
 if __name__ == "__main__":
