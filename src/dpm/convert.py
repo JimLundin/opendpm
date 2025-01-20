@@ -78,9 +78,5 @@ if __name__ == "__main__":
         create_engine(f"duckdb:///{output_dir / 'output.duckdb'}"),
     ]
 
-    if not target_engines:
-        logger.error("Failed to create any target engines")
-        raise SystemExit(1)
-
     # Run migration
     migrate_databases(input_dir, target_engines)
