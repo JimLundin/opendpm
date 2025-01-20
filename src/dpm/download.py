@@ -7,8 +7,8 @@ import logging
 import tomllib
 import zipfile
 from pathlib import Path
-
-import requests
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,18 +30,19 @@ def download_and_extract(url: str, target_dir: Path) -> None:
 
     try:
         logger.info("Downloading from %s", url)
-        response = requests.get(url, timeout=60, allow_redirects=False)
-        response.raise_for_status()
+        if not url.startswith(("http://", "https://")):
+            msg = f"Invalid URL: {url}, url should start with http:// or https://"
+            raise ValueError(msg)
 
-        # Extract the file directly from memory
+        response = urlopen(url, timeout=30)  # noqa: S310
         logger.info("Extracting to %s", target_dir)
-        with zipfile.ZipFile(io.BytesIO(response.content)) as zip_ref:
+        with zipfile.ZipFile(io.BytesIO(response.read())) as zip_ref:
             for zip_info in zip_ref.filelist:
                 if zip_info.filename.lower().endswith(".accdb"):
                     zip_ref.extract(zip_info, target_dir)
                     logger.info("Extracted %s", zip_info.filename)
 
-    except (requests.RequestException, zipfile.BadZipFile):
+    except (URLError, HTTPError, zipfile.BadZipFile):
         logger.exception("Failed to process %s", url)
         raise
 
