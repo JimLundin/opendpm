@@ -1,3 +1,4 @@
+[project]
 name = "opendpm"
 version = "0.1.0"
 description = "Open-source tools and models for working with DPM databases"
