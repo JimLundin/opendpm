@@ -1,24 +1,34 @@
 """Database processing utilities for handling multiple Access databases."""
 
 import logging
-import time
 from pathlib import Path
 
-from sqlalchemy import Connection, Engine, MetaData, create_engine, event, text
-
-from opendpm.convert.transformations import (
-    cast_row_values,
-    genericize_datatypes,
-    get_required_columns,
-    remove_pk_index,
-    set_required_columns,
+from sqlalchemy import (
+    Connection,
+    Engine,
+    MetaData,
+    create_engine,
+    event,
+    insert,
+    select,
+    text,
 )
-from opendpm.convert.utils import format_time
+from sqlalchemy.orm import Session
+
+from opendpm.convert.generation import generate_models
+from opendpm.convert.transformations import (
+    Rows,
+    genericize_datatypes,
+    parse_rows,
+    remove_pk_index,
+    set_enum_columns,
+    set_nullable_columns,
+)
 
 logger = logging.getLogger(__name__)
 
 
-def get_access_engine(db_path: str | Path) -> Engine:
+def create_access_engine(db_path: str | Path) -> Engine:
     """Get an engine to an Access database."""
     driver = "{Microsoft Access Driver (*.mdb, *.accdb)}"
     conn_str = f"DRIVER={driver};DBQ={db_path}"
@@ -32,68 +42,46 @@ def execute_queries(connection: Connection, queries: list[str]) -> None:
     connection.commit()
 
 
-def process_database(source_path: Path, target_engine: Engine) -> None:
+def process_database(source_engine: Engine, target_engine: Engine) -> str:
     """Process a single Access database.
 
     Args:
-        source_path: Path to the Access database file
+        source_engine: Engine to the source Access database
         target_engine: Engine to the target SQLite database
 
+    Returns:
+        str: Generated SQLAlchemy model code
+
     """
-    start = time.time()
-    logger.info("%s - Processing database", source_path.name)
-
-    source_engine = get_access_engine(source_path)
-
     metadata = MetaData()
     event.listen(metadata, "column_reflect", genericize_datatypes)
     metadata.reflect(bind=source_engine)
 
-    with source_engine.connect() as source_conn, target_engine.connect() as target_conn:
-        for table in metadata.tables.values():
-            required_columns = get_required_columns(source_conn, table)
-            set_required_columns(table, required_columns)
+    with (
+        Session(source_engine) as source,
+        Session(target_engine) as target,
+        source.begin(),
+        target.begin(),
+    ):
+        table_rows: dict[str, Rows] = {}
+        for name, table in metadata.tables.items():
+            data = source.execute(select(table)).all()
+            rows = [row._asdict() for row in data]  # type: ignore private attribute
+
+            enum_columns, nullable_columns = parse_rows(rows)
+            set_enum_columns(table, enum_columns)
+            set_nullable_columns(table, nullable_columns)
             remove_pk_index(table)
+
+            table_rows[name] = rows
 
         metadata.create_all(target_engine)
 
-        target_conn.begin()
-
-        for table_name, table in metadata.tables.items():
-            fetch_start = time.time()
-
-            data = source_conn.execute(table.select()).fetchall()
-            if not data:
-                logger.info("Table: %s - No data to copy", table_name)
+        for name, rows in table_rows.items():
+            if not rows:
                 continue
 
-            rows = [row._asdict() for row in data]  # type: ignore private attribute
-            cast_row_values(rows)
-            insert_start = time.time()
+            table = metadata.tables[name]
+            target.execute(insert(table), rows)
 
-            target_conn.execute(table.insert(), rows)
-            logger.info(
-                "Table: %s, rows: %d, columns: %d, fetch: %s, insert: %s",
-                table_name,
-                len(rows),
-                len(rows[0]) if rows else 0,
-                format_time(insert_start - fetch_start),
-                format_time(time.time() - insert_start),
-            )
-
-        target_conn.commit()
-
-        # Optimize the database
-        execute_queries(
-            target_conn,
-            [
-                "VACUUM",
-                "PRAGMA optimize",
-            ],
-        )
-
-    logger.info(
-        "Database: %s, total time: %s",
-        source_path.name,
-        format_time(time.time() - start),
-    )
+    return generate_models(metadata, target_engine)
