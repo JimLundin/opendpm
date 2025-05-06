@@ -12,7 +12,7 @@ readme = "README.md"
 requires-python = ">= 3.13"
 
 [project.scripts]
-opendpm = "opendpm.cli:main"
+opendpm = "src.cli:main"
 
 [project.optional-dependencies]
 scrape = [
@@ -51,7 +51,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["opendpm"]
+packages = ["src"]
 
 [tool.hatch.metadata]
 allow-direct-references = true

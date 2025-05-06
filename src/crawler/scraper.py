@@ -8,7 +8,7 @@ from typing import Final
 from bs4 import BeautifulSoup, Tag
 from requests import get, head
 
-from opendpm.versions import VersionUrls, compare_version_urls
+from archive import VersionUrls, compare_version_urls
 
 # Configure logging
 logging.basicConfig(

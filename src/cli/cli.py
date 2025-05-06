@@ -6,8 +6,7 @@ from json import dump
 from pathlib import Path
 from sys import stdout
 
-from opendpm.download import download_source, extract_archive
-from opendpm.versions import (
+from archive import (
     Source,
     Version,
     get_version,
@@ -15,6 +14,7 @@ from opendpm.versions import (
     get_versions_by_type,
     latest_version,
 )
+from downloader import download_source, extract_archive
 
 VERSIONS = get_versions()
 VERSION_IDS = [v["id"] for v in VERSIONS]
@@ -171,7 +171,7 @@ def handle_list_command(args: Namespace) -> None:
 def handle_update_command(args: Namespace) -> None:
     """Handle the 'update' subcommand."""
     try:
-        from opendpm.scraper import get_new_reporting_frameworks
+        from crawler import get_new_reporting_frameworks
     except ImportError:
         print("Please install the 'scrape' extra: pip install opendpm[scrape]")
         return
@@ -216,7 +216,7 @@ def handle_download_command(args: Namespace) -> None:
         print("Source not available")
         return
 
-    archive = download_source(source)
+    archive = download_source(source["url"], source.get("checksum"))
     target_folder = args.target / version_id
     extract_archive(archive, target_folder)
     print(f"Downloaded version {version_id} to {target_folder}")
@@ -235,7 +235,7 @@ def main() -> None:
         handle_download_command(args)
     elif args.command == "convert":
         try:
-            from opendpm.convert import convert_access_to_sqlite
+            from convert import convert_access_to_sqlite
         except ImportError:
             print("Please install the 'convert' extra: pip install opendpm[convert]")
             return

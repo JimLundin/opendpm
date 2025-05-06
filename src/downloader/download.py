@@ -12,8 +12,6 @@ from requests import get
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from opendpm.versions import Source
-
 
 def verify_checksum(data: bytes, checksum: str) -> bool:
     """Verify the checksum of the data."""
@@ -24,12 +22,12 @@ def verify_checksum(data: bytes, checksum: str) -> bool:
     return checksum == f"sha256:{sha256(data).hexdigest()}"
 
 
-def download_source(source: Source) -> BytesIO:
+def download_source(url: str, checksum: str | None = None) -> BytesIO:
     """Download the zip file containing the DPM database."""
-    response = get(source["url"], timeout=30, allow_redirects=False)
+    response = get(url, timeout=30, allow_redirects=False)
     response.raise_for_status()
 
-    if checksum := source.get("checksum"):
+    if checksum:
         if not verify_checksum(response.content, checksum):
             print("Checksum verification failed")
     else:
