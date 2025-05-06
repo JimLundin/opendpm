@@ -2,7 +2,7 @@
 
 import logging
 
-from .cli import main
+from .commands import main
 
 logging.basicConfig(
     level=logging.INFO,
