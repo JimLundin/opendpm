@@ -3,12 +3,11 @@
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from datetime import date, datetime
-from typing import Any, NotRequired, TypedDict
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
     Date,
-    DateTime,
     Enum,
     ForeignKey,
     Inspector,
@@ -18,7 +17,8 @@ from sqlalchemy import (
     Uuid,
 )
 from sqlalchemy.engine.interfaces import ReflectedColumn
-from sqlalchemy.types import TypeEngine
+
+from convert.config import ConversionConfig, load_config
 
 type FieldValue = str | int | bool | date | datetime | None
 type TableRow = dict[str, FieldValue]
@@ -28,53 +28,44 @@ type ColumnEnumMap = dict[str, set[str]]
 type Rows = Sequence[Row[Any]]
 
 
-class ColumnType(TypedDict):
-    """Column type mapping."""
+def init_config(
+    config: ConversionConfig | None = None,
+) -> Callable[[], ConversionConfig]:
+    """Initialize the global configuration instance."""
+    _config = config or load_config()
 
-    sql: TypeEngine[Any]
-    python: NotRequired[Callable[[FieldValue], FieldValue]]
+    def get_config() -> ConversionConfig:
+        """Get the global configuration instance."""
+        return _config
+
+    return get_config
 
 
-# Mapping specific column names to their appropriate types
-COLUMN_TYPE_OVERRIDES: dict[str, ColumnType] = {
-    "ParentFirst": {"sql": Boolean(), "python": bool},
-    "UseIntervalArithmetics": {"sql": Boolean(), "python": bool},
-    "StartDate": {"sql": DateTime()},
-    "EndDate": {"sql": DateTime()},
-}
+get_config = init_config()
 
 
 def is_guid(column: str) -> bool:
     """Check if a column is a GUID column."""
-    return column.lower().endswith("guid")
+    config = get_config()
+    return column.lower().endswith(config.patterns.guid_suffixes)
 
 
 def is_bool(column: str) -> bool:
     """Check if a column is a boolean column."""
-    return column.lower().startswith(("is", "has"))
+    config = get_config()
+    return column.lower().startswith(config.patterns.bool_prefixes)
 
 
 def is_date(column: str) -> bool:
     """Check if a column is a date column."""
-    return column.lower().endswith("date")
+    config = get_config()
+    return column.lower().endswith(config.patterns.date_suffixes)
 
 
 def is_enum(column: str) -> bool:
     """Check if a column is an enum column."""
-    return column.lower().endswith(
-        (
-            "type",
-            "status",
-            "sign",
-            "optionality",
-            "direction",
-            "number",
-            "endorsement",
-            "source",
-            "severity",
-            "errorcode",
-        ),
-    )
+    config = get_config()
+    return column.lower().endswith(config.patterns.enum_suffixes)
 
 
 def genericize(_i: Inspector, _t: str, column: ReflectedColumn) -> None:
@@ -86,10 +77,12 @@ def genericize(_i: Inspector, _t: str, column: ReflectedColumn) -> None:
     booleans, which this function corrects based on naming conventions and known
     column characteristics.
     """
+    config = get_config()
     column_name = column["name"]
     column_type = column["type"]
-    if column_name in COLUMN_TYPE_OVERRIDES:
-        column_type = COLUMN_TYPE_OVERRIDES[column_name]["sql"]
+
+    if column_name in config.column_type_overrides:
+        column_type = config.column_type_overrides[column_name].sql
     elif is_guid(column_name):
         column_type = Uuid()
     elif is_date(column_name):
@@ -108,10 +101,13 @@ def cast_value(column: str, value: FieldValue) -> FieldValue:
     """Transform row values to appropriate Python types."""
     if value is None:
         return None
-    if column in COLUMN_TYPE_OVERRIDES and (
-        caster := COLUMN_TYPE_OVERRIDES[column].get("python")
-    ):
-        return caster(value)
+
+    config = get_config()
+    if column in config.column_type_overrides:
+        column_config = config.column_type_overrides[column]
+        if column_config.python:
+            return column_config.python(value)
+
     if is_date(column) and isinstance(value, str):
         return date.fromisoformat(value)
     if is_bool(column):
@@ -162,5 +158,6 @@ def add_foreign_key(source_column: str, target_column: str, table: Table) -> Non
 
 def add_foreign_keys(table: Table) -> None:
     """Set missing foreign keys."""
-    add_foreign_key("RowGUID", "Concept.ConceptGUID", table)
-    add_foreign_key("ParentItemID", "Item.ItemID", table)
+    config = get_config()
+    for source_col, target_col in config.foreign_key_mappings.items():
+        add_foreign_key(source_col, target_col, table)

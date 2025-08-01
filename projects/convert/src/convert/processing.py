@@ -3,8 +3,20 @@
 from logging import getLogger
 from pathlib import Path
 
-from sqlalchemy import Engine, MetaData, Table, create_engine, event, insert, select
+from sqlalchemy import (
+    Engine,
+    MetaData,
+    Table,
+    create_engine,
+    event,
+    insert,
+    select,
+)
 
+from convert.progress import (
+    ProgressReporter,
+    SilentProgressReporter,
+)
 from convert.transformations import (
     TableData,
     add_foreign_keys,
@@ -49,11 +61,16 @@ def reflect_schema(source: Engine) -> MetaData:
     return metadata
 
 
-def extract_schema_and_data(source: Engine) -> tuple[MetaData, TableDataMap]:
+def extract_schema_and_data(
+    source: Engine,
+    progress_reporter: ProgressReporter | None = None,
+) -> tuple[MetaData, TableDataMap]:
     """Extract data and schema from a single Access database.
 
     Args:
         source: Engine to the source Access database
+        batch_size: Number of rows to process in each batch
+        progress_reporter: Optional progress reporter for monitoring
 
     Returns:
         MetaData: Database metadata
@@ -61,6 +78,9 @@ def extract_schema_and_data(source: Engine) -> tuple[MetaData, TableDataMap]:
 
     """
     metadata = reflect_schema(source)
+
+    if progress_reporter is None:
+        progress_reporter = SilentProgressReporter()
 
     tables: TableDataMap = []
     with source.begin() as connection:
