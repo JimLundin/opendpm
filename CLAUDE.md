@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `uv sync` - Install all dependencies and sync the workspace
 - `uv pip install -e .` - Install main package in development mode
 - `uv pip install -e projects/archive` - Install specific subproject
-- `uv pip install -e projects/convert` - Install conversion tools (Windows only)
+- `uv pip install -e projects/migrate` - Install migration tools (Windows only)
 - `uv pip install -e projects/scrape` - Install scraping tools
 
 ### Code Quality
@@ -24,7 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `opendpm list` - List available database versions
 - `opendpm download --release --converted` - Download latest stable release
 - `opendpm scrape` - Find new EBA releases
-- `opendpm convert --source SOURCE --target TARGET` - Convert Access to SQLite (Windows only)
+- `opendpm migrate --source SOURCE --target TARGET` - Migrate Access to SQLite (Windows only)
 
 ## Architecture Overview
 
@@ -37,30 +37,30 @@ OpenDPM is a UV workspace with multiple specialized subprojects:
 
 ### Workspace Subprojects (`projects/`)
 - **`archive/`**: Version management, downloads, and release tracking
-- **`convert/`**: Access-to-SQLite conversion engine (Windows-only, requires ODBC drivers)
+- **`migrate/`**: Access-to-SQLite migration engine (Windows-only, requires ODBC drivers)
 - **`scrape/`**: Automated discovery of new EBA releases via web scraping
 - **`dpm2/`**: Generated Python packages (future enhancement placeholder)
 
 ### Key Design Patterns
 - **Workspace Architecture**: Uses UV workspace with `[tool.uv.workspace]` for managing multiple related packages
-- **Optional Dependencies**: Platform-specific functionality (like conversion) is optional via `[project.optional-dependencies]`
+- **Optional Dependencies**: Platform-specific functionality (like migration) is optional via `[project.optional-dependencies]`
 - **Dynamic Imports**: CLI uses try/except imports to gracefully handle missing optional dependencies
 - **Type Safety**: Strict typing with mypy and pyright, comprehensive type annotations
 
 ### Data Flow
 1. **Version Discovery**: `scrape` finds new EBA releases
 2. **Download Management**: `archive` handles version tracking and downloads
-3. **Conversion Pipeline**: `convert` transforms Access databases to SQLite with type-safe Python models
+3. **Migration Pipeline**: `migrate` transforms Access databases to SQLite with type-safe Python models
 4. **CLI Coordination**: Main package orchestrates functionality across subprojects
 
 ### Important Constraints
-- **Platform Dependency**: Conversion requires Windows due to Microsoft Access ODBC drivers
+- **Platform Dependency**: Migration requires Windows due to Microsoft Access ODBC drivers
 - **UV Build System**: Uses `uv_build` as build backend instead of standard setuptools
 - **Strict Code Quality**: All code must pass ruff linting, mypy, and pyright type checking
 - **Python Version**: Requires Python 3.13+
 
 ### Testing and CI/CD
 - GitHub Actions pipeline automatically detects new EBA releases
-- Windows runners handle database conversion due to platform requirements
+- Windows runners handle database migration due to platform requirements
 - Generated artifacts are published as GitHub releases
 - CLI provides both direct download and release-based distribution
