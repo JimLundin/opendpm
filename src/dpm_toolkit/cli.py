@@ -83,6 +83,9 @@ def log_info(message: str, verbosity: Verbosity = Verbosity.INFO) -> None:
     """Print info message if not quiet."""
     if verbosity == Verbosity.QUIET:
         return
+    if verbosity == Verbosity.DEBUG:
+        print(f"[DEBUG] {message}")
+        return
     if verbosity == Verbosity.INFO:
         print(message)
         return
@@ -274,6 +277,38 @@ def create_parser() -> ArgumentParser:
         help="Path to save SQLAlchemy schema file to (default: %(default)s)",
     )
 
+    compare_parser = subparsers.add_parser(
+        "compare",
+        help="Compare two SQLite databases",
+        description="Compare schema and data between two SQLite database versions",
+    )
+    compare_parser.add_argument(
+        "--source",
+        "-s",
+        type=Path,
+        required=True,
+        help="Path to source (older) SQLite database",
+    )
+    compare_parser.add_argument(
+        "--target",
+        "-t",
+        type=Path,
+        required=True,
+        help="Path to target (newer) SQLite database",
+    )
+    compare_parser.add_argument(
+        "--format",
+        choices=["json", "html"],
+        default="json",
+        help="Output format: json (default) or html",
+    )
+    compare_parser.add_argument(
+        "--output",
+        "-o",
+        type=Path,
+        help="Output file path (optional, prints to stdout if not specified)",
+    )
+
     return parser
 
 
@@ -346,7 +381,6 @@ def handle_download_command(args: Namespace) -> None:
 
     version_id = version["id"]
     log_info(f"Downloading version {version_id} ({args.type})", args.verbosity)
-    log_info(f"Version details: {version}", args.verbosity)
 
     source = handle_source(args, version)
     if not source:
@@ -416,6 +450,51 @@ def handle_schema_command(args: Namespace) -> None:
     generate_schema(args.source, args.target)
 
 
+def handle_compare_command(args: Namespace) -> None:
+    """Handle the 'compare' subcommand."""
+    try:
+        from compare import compare_databases, comparison_to_json, generate_report
+    except ImportError as e:
+        print(f"Compare functionality not available: {e}")
+        return
+
+    source_path = Path(args.source)
+    target_path = Path(args.target)
+
+    if not source_path.exists():
+        print(f"Error: Source database not found: {source_path}")
+        return
+
+    if not target_path.exists():
+        print(f"Error: Target database not found: {target_path}")
+        return
+
+    print("Comparing databases:")
+    print(f"  Source: {source_path}")
+    print(f"  Target: {target_path}")
+
+    # Perform the comparison
+    result = compare_databases(source_path, target_path)
+
+    # Generate JSON output
+    json_output = comparison_to_json(result)
+
+    # Handle output based on format
+    if args.format == "html":
+        output_path = args.output or Path("comparison_report.html")
+        generate_report(result, output_path)
+        log_info(f"HTML report saved to: {output_path}")
+    elif hasattr(args, "output") and args.output:
+        # Save JSON to file
+        output_path = Path(args.output)
+        output_path.write_text(json_output, encoding="utf-8")
+        log_info(f"JSON report saved to: {output_path}")
+    else:
+        # Print JSON to stdout
+        log_info("\nComparison Results:")
+        log_info(json_output)
+
+
 def main() -> None:
     """Entry point for the CLI."""
     parser = create_parser()
@@ -431,6 +510,8 @@ def main() -> None:
         handle_migrate_command(args)
     elif args.command == "schema":
         handle_schema_command(args)
+    elif args.command == "compare":
+        handle_compare_command(args)
     else:
         parser.print_help()
 
